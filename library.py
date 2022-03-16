@@ -1,4 +1,5 @@
 import textwrap
+import pandas as pd
 
 INITIAL_PERMUTATION_TABLE = [
 58,50,42,34,26,18,10,2,
@@ -67,32 +68,39 @@ PERMUTATION_TABLE = [
 19,13,30,6,22,11,4,25
 ]
 
-# 1. Adım açık metine karşılık gelen ikili kod
+# 1 açık metine karşılık gelen ikili kod
 def string_to_binary(plaintext):
     binary_plaintext = ''.join(format(ord(i),'b').zfill(8) for i in plaintext) 
     return binary_plaintext
 
-# 2. Adım IP uygulanması
-def apply_initial_permutation(binary_plaintext, TABLE=INITIAL_PERMUTATION_TABLE):
+# 2 IP uygulanması
+def apply_initial_permutation(binary_plaintext,TABLE=INITIAL_PERMUTATION_TABLE):
     permutated_text = ""
     for index in TABLE:
-        permutated_text += binary_plaintext[int(index)-1]
+        permutated_text += binary_plaintext[index-1]
     return permutated_text
 
-# 3.Adım L0 ve R0 ayrımı
+#  L0 ve R0 ayrımı
 def split_in_half(binarybits):
     L0 = binarybits[:32]
     R0 = binarybits[32:]
     return L0,R0
 
-# 4.Adım Expansion Table 
-def apply_expansion(R0,PERMUTATION_TABLE=EXPANSION_TABLE):
+# 
+def apply_inverse_permutation(binary_plaintext,TABLE=INVERSE_PERMUTATION_TABLE):
+    permutated_text = ""
+    for index in TABLE:
+        permutated_text += binary_plaintext[index-1]
+    return permutated_text
+
+#  Expansion Table 
+def apply_expansion(R0,TABLE=EXPANSION_TABLE):
     bits48 = ""
-    for index in EXPANSION_TABLE:
+    for index in TABLE:
         bits48 += R0[index-1]
     return bits48
 
-# 5.Adım XOR
+#  XOR
 def XOR(bits1,bits2):
 	xor_result = ""
 	for index in range(len(bits1)):
@@ -102,7 +110,7 @@ def XOR(bits1,bits2):
 			xor_result += '1'
 	return xor_result
 
-# 6.Adım SBOX
+#  SBOX
 def split_in_6bits(XOR_48bits):
 	list_of_6bits = textwrap.wrap(XOR_48bits,6)
 	return list_of_6bits
@@ -123,18 +131,18 @@ def decimal_to_binary(decimal):
 	binary4bits = bin(decimal)[2:].zfill(4)
 	return binary4bits
 
-def sbox_lookup(sboxcount,first_last,middle4):
+def sbox_lookup(first_last,middle4):
 	d_first_last = binary_to_decimal(first_last)
 	d_middle = binary_to_decimal(middle4)
 	
-	sbox_value = SBOX[sboxcount][d_first_last][d_middle]
+	sbox_value = SBOX[d_first_last][d_middle]
 	return decimal_to_binary(sbox_value)
 
-# 7.Adım Permutation table
-def apply_permutation(sbox_32bits,PERMUTATION_TABLE=PERMUTATION_TABLE):
+#  Permutation table
+def apply_permutation(sbox_32bits,TABLE=PERMUTATION_TABLE):
 	
 	final_32bits = ""
-	for index in PERMUTATION_TABLE:
+	for index in TABLE:
 		final_32bits += sbox_32bits[index-1]
 	return final_32bits
 
@@ -148,7 +156,7 @@ def functionF(pre32bits, key48bits):
 	for sboxcount, bits6 in enumerate(bits6list):
 		first_last = get_first_and_last_bit(bits6)
 		middle4 = get_middle_four_bit(bits6)
-		sboxvalue = sbox_lookup(sboxcount,first_last,middle4)
+		sboxvalue = sbox_lookup(first_last,middle4)
 		result += sboxvalue
 	final32bits = apply_permutation(result)	
 	return final32bits
@@ -156,31 +164,31 @@ def functionF(pre32bits, key48bits):
 ###########################################################
 # ANAHTAR OLUŞTURMA
 
-# 1.Adım PC1
-def apply_pc1(key_64bits,PERMUTATION_TABLE=PC1_TABLE):
+#  PC1
+def apply_pc1(key_64bits,TABLE = PC1_TABLE):
     key_56bits = ""
-    for index in PC1_TABLE:
+    for index in TABLE:
         key_56bits += key_64bits[index-1]
     return key_56bits
 
-# 2.Adım Left Key ve Right Key ayrımı
+#  Left Key ve Right Key ayrımı
 def split_in_half(key_56bits):
     left_key = key_56bits[:28]
     right_key = key_56bits[28:]
     return left_key,right_key
 
-# 3.Adım Circular Left Shift
+#  Circular Left Shift
 def circular_left_shift(left_key,right_key):
     shifted_left = left_key[1:] + left_key[:1]
     shifted_right = right_key[1:] + right_key[:1]
     shifted = shifted_left + shifted_right
     return shifted
 
-# 4.Adım PC2
-def apply_pc2(shifted,PERMUTATION_TABLE=PC2_TABLE):
+#  PC2
+def apply_pc2(shifted,TABLE=PC2_TABLE):
     key_48bits = ""
-    for index in PC2_TABLE:
-        keys_48bits += shifted[index-1]
+    for index in TABLE:
+        key_48bits += shifted[index-1]
     return key_48bits
 
 # ANAHTAR OLUŞTURMA
@@ -203,28 +211,38 @@ def hexTobinary(hexdigits):
 def DES_encrypt(message,key):
 	cipher = ""
 
-	plaintext_bits = hexTobinary(message)
-	key_bits = hexTobinary(key)
+	plaintext_bits = string_to_binary(message)
+	key_bits = string_to_binary(key)
 	
-	roundkeys = generate_key(key_bits)
+	roundkey = generate_key(key_bits)
 	
 	
 	
-	p_plaintext = apply_initial_permutation(INITIAL_PERMUTATION_TABLE,plaintext_bits)
+	p_plaintext = apply_initial_permutation(plaintext_bits)
 	
 	L,R = split_in_half(p_plaintext)
+
+	newR = XOR(L,functionF(R, roundkey))
+	newL = R
+	R = newR
+	L = newL
+
+	cipher = apply_inverse_permutation(R+L)
 	
-	for round in range(16):
-		newR = XOR(L,functionF(R, roundkeys[round]))
-		newL = R
-		R = newR
-		L = newL
-	cipher = apply_initial_permutation(INVERSE_PERMUTATION_TABLE, R+L)
 	return cipher
 
+def binary_plaintext_table(binary_plaintext):
+	bp = []
 
+	for i in range(64):
+		bp.append(binary_plaintext[i])
 
-
-if __name__ == "__main__":
-    print(DES_encrypt("kemalozer","21721149"))
-
+	BP = pd.DataFrame([bp[0:8],
+                bp[8:16],
+                bp[16:24],
+                bp[24:32],
+                bp[32:40],
+                bp[40:48],
+                bp[48:56],
+                bp[56:64]])
+	return BP
