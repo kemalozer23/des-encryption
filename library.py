@@ -179,8 +179,8 @@ def split_in_half(key_56bits):
 
 #  Circular Left Shift
 def circular_left_shift(left_key,right_key):
-    shifted_left = left_key[1:] + left_key[:1]
-    shifted_right = right_key[1:] + right_key[:1]
+    shifted_left = left_key[1:] + left_key[0]
+    shifted_right = right_key[1:] + right_key[0]
     shifted = shifted_left + shifted_right
     return shifted
 
